@@ -79,6 +79,8 @@
 
     `$ cp ./api/base/settings/local-dist.py ./api/base/settings/local.py`
 
+    `$ cp ./docker-compose-dist.override.yml ./docker-compose.override.yml`
+
 2. OPTIONAL (uncomment the below lines if you will use remote debugging) Environment variables (incl. remote debugging)
   - e.g. .docker-compose.env
 
@@ -150,7 +152,7 @@ Ubuntu: Skip install of docker-sync. instead...
   ```bash
   $ docker-sync start
   # Wait until you see "Nothing to do: replicas have not changed since last sync."
-  $ docker-compose up -d assets admin_assets mfr wb fakecas sharejs worker web api admin preprints registries
+  $ docker-compose up -d assets admin_assets mfr wb fakecas sharejs worker web api admin preprints registries ember_osf_web
   ```
 
 - To view the logs for a given container: 
@@ -176,6 +178,9 @@ Ubuntu: Skip install of docker-sync. instead...
 - Populate citation styles
   - Needed for api v2 citation style rendering.
     - `docker-compose run --rm web python -m scripts.parse_citation_styles`
+- Start ember_osf_web
+  - Needed for quickfiles feature:
+    - `docker-compose up -d ember_osf_web`
 - OPTIONAL: Register OAuth Scopes
   - Needed for things such as the ember-osf dummy app
     - `docker-compose run --rm web python -m scripts.register_oauth_scopes`

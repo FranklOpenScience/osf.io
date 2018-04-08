@@ -188,7 +188,7 @@ class TestProvisionNode(ContextTestCase):
         assert_in('emailed', self.node.system_tags)
         assert_in('spam', self.node.system_tags)
 
-    @mock.patch('website.util.waterbutler_api_url_for')
+    @mock.patch('website.conferences.utils.waterbutler_api_url_for')
     @mock.patch('website.conferences.utils.requests.put')
     def test_upload(self, mock_put, mock_get_url):
         mock_get_url.return_value = 'http://queen.com/'
@@ -208,7 +208,7 @@ class TestProvisionNode(ContextTestCase):
             data=self.content,
         )
 
-    @mock.patch('website.util.waterbutler_api_url_for')
+    @mock.patch('website.conferences.utils.waterbutler_api_url_for')
     @mock.patch('website.conferences.utils.requests.put')
     def test_upload_no_file_name(self, mock_put, mock_get_url):
         mock_get_url.return_value = 'http://queen.com/'
@@ -588,7 +588,7 @@ class TestConferenceIntegration(ContextTestCase):
         nodes = AbstractNode.objects.filter(title=title)
         assert_equal(nodes.count(), 1)
         node = nodes[0]
-        assert_equal(node.get_wiki_page('home').content, body)
+        assert_equal(node.get_wiki_version('home').content, body)
         assert_true(mock_send_mail.called)
         call_args, call_kwargs = mock_send_mail.call_args
         assert_absolute(call_kwargs['conf_view_url'])
@@ -677,7 +677,7 @@ class TestConferenceIntegration(ContextTestCase):
         nodes = AbstractNode.objects.filter(title=title)
         assert_equal(nodes.count(), 1)
         node = nodes[0]
-        assert_equal(node.get_wiki_page('home').content, body)
+        assert_equal(node.get_wiki_version('home').content, body)
         assert_true(mock_send_mail.called)
         call_args, call_kwargs = mock_send_mail.call_args
         assert_absolute(call_kwargs['conf_view_url'])

@@ -25,12 +25,12 @@ from osf.models import OSFUser
 from osf.models import BaseFileNode
 from osf.models import Institution
 from osf.models import QuickFilesNode
+from osf.utils.sanitize import unescape_entities
 from website import settings
 from website.filters import profile_image_url
 from osf.models.licenses import serialize_node_license_record
 from website.search import exceptions
 from website.search.util import build_query, clean_splitters
-from website.util import sanitize
 from website.views import validate_page_num
 
 logger = logging.getLogger(__name__)
@@ -257,10 +257,10 @@ def format_result(result, parent_id=None):
         'contributors': result['contributors'],
         'wiki_link': result['url'] + 'wiki/',
         # TODO: Remove unescape_entities when mako html safe comes in
-        'title': sanitize.unescape_entities(result['title']),
+        'title': unescape_entities(result['title']),
         'url': result['url'],
         'is_component': False if parent_info is None else True,
-        'parent_title': sanitize.unescape_entities(parent_info.get('title')) if parent_info else None,
+        'parent_title': unescape_entities(parent_info.get('title')) if parent_info else None,
         'parent_url': parent_info.get('url') if parent_info is not None else None,
         'tags': result['tags'],
         'is_registration': (result['is_registration'] if parent_info is None
@@ -269,7 +269,7 @@ def format_result(result, parent_id=None):
         'is_pending_retraction': result['is_pending_retraction'],
         'embargo_end_date': result['embargo_end_date'],
         'is_pending_embargo': result['is_pending_embargo'],
-        'description': sanitize.unescape_entities(result['description']),
+        'description': unescape_entities(result['description']),
         'category': result.get('category'),
         'date_created': result.get('date_created'),
         'date_registered': result.get('registered_date'),
@@ -284,23 +284,18 @@ def format_result(result, parent_id=None):
 
 def load_parent(parent_id):
     parent = AbstractNode.load(parent_id)
-    if parent is None:
-        return None
-    parent_info = {}
-    if parent is not None and parent.is_public:
-        parent_info['title'] = parent.title
-        parent_info['url'] = parent.url
-        parent_info['is_registration'] = parent.is_registration
-        parent_info['id'] = parent._id
-    else:
-        parent_info['title'] = '-- private project --'
-        parent_info['url'] = ''
-        parent_info['is_registration'] = None
-        parent_info['id'] = None
-    return parent_info
+    if parent and parent.is_public:
+        return {
+            'title': parent.title,
+            'url': parent.url,
+            'id': parent._id,
+            'is_registation': parent.is_registration,
+        }
+    return None
 
 
 COMPONENT_CATEGORIES = set(settings.NODE_CATEGORY_MAP.keys())
+
 
 def get_doctype_from_node(node):
     if node.is_registration:
@@ -334,8 +329,6 @@ def update_user_async(self, user_id, index=None):
         self.retry(exc)
 
 def serialize_node(node, category):
-    NodeWikiPage = apps.get_model('addons_wiki.NodeWikiPage')
-
     elastic_document = {}
     parent_id = node.parent_id
 
@@ -378,9 +371,9 @@ def serialize_node(node, category):
         'preprint_url': node.preprint_url,
     }
     if not node.is_retracted:
-        for wiki in NodeWikiPage.objects.filter(guids___id__in=node.wiki_pages_current.values()):
+        for wiki in node.get_wiki_pages_latest():
             # '.' is not allowed in field names in ES2
-            elastic_document['wikis'][wiki.page_name.replace('.', ' ')] = wiki.raw_text(node)
+            elastic_document['wikis'][wiki.wiki_page.page_name.replace('.', ' ')] = wiki.raw_text(node)
 
     return elastic_document
 
@@ -512,7 +505,11 @@ def update_file(file_, index=None, delete=False):
     index = index or INDEX
 
     # TODO: Can remove 'not file_.name' if we remove all base file nodes with name=None
-    file_node_is_qa = bool(set(settings.DO_NOT_INDEX_LIST['tags']).intersection(file_.node.tags.all().values_list('name', flat=True))) or any(substring in file_.node.title for substring in settings.DO_NOT_INDEX_LIST['titles'])
+    file_node_is_qa = bool(
+        set(settings.DO_NOT_INDEX_LIST['tags']).intersection(file_.tags.all().values_list('name', flat=True))
+    ) or bool(
+        set(settings.DO_NOT_INDEX_LIST['tags']).intersection(file_.node.tags.all().values_list('name', flat=True))
+    ) or any(substring in file_.node.title for substring in settings.DO_NOT_INDEX_LIST['titles'])
     if not file_.name or not file_.node.is_public or delete or file_.node.is_deleted or file_.node.archiving or file_node_is_qa:
         client().delete(
             index=index,

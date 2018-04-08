@@ -275,9 +275,7 @@ class TestRegistrationRetractions(OsfTestCase):
             docs = query(value)['results']
             assert_equal(len(docs), 0)
             with run_celery_tasks():
-                self.registration.update_node_wiki(
-                    key, value, self.consolidate_auth,
-                )
+                self.registration.create_or_update_node_wiki(name=key, content=value, auth=self.consolidate_auth)
             # Query and ensure unique string shows up
             docs = query(value)['results']
             assert_equal(len(docs), 1)
@@ -308,9 +306,7 @@ class TestRegistrationRetractions(OsfTestCase):
             docs = query(value)['results']
             assert_equal(len(docs), 0)
             with run_celery_tasks():
-                self.registration.update_node_wiki(
-                    key, value, self.consolidate_auth,
-                )
+                self.registration.create_or_update_node_wiki(name=key, content=value, auth=self.consolidate_auth)
             # Query and ensure unique string shows up
             docs = query(value)['results']
             assert_equal(len(docs), 1)
@@ -414,7 +410,7 @@ class TestPublicNodes(OsfTestCase):
             self.project.set_privacy('private')
         docs = query('category:component AND ' + self.title)['results']
         assert_equal(len(docs), 1)
-        assert_equal(docs[0]['parent_title'], '-- private project --')
+        assert_false(docs[0]['parent_title'])
         assert_false(docs[0]['parent_url'])
 
     def test_delete_project(self):
@@ -988,6 +984,20 @@ class TestSearchFiles(OsfTestCase):
         quickfiles_root.append_file('GreenLight.mp3')
         find = query_file('GreenLight.mp3')['results']
         assert_equal(len(find), 1)
+
+    def test_qatest_quickfiles_files_not_appear_in_search(self):
+        quickfiles = QuickFilesNode.objects.get(creator=self.node.creator)
+        quickfiles_osf_storage = quickfiles.get_addon('osfstorage')
+        quickfiles_root = quickfiles_osf_storage.get_root()
+
+        file = quickfiles_root.append_file('GreenLight.mp3')
+        tag = Tag(name='qatest')
+        tag.save()
+        file.tags.add(tag)
+        file.save()
+
+        find = query_file('GreenLight.mp3')['results']
+        assert_equal(len(find), 0)
 
     def test_quickfiles_spam_user_files_do_not_appear_in_search(self):
         quickfiles = QuickFilesNode.objects.get(creator=self.node.creator)
